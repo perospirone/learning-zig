@@ -27,11 +27,34 @@ pub fn main() !void {
 
     gl.viewport(0, 0, scr_width, scr_height);
 
-    const vertices = &[_]f32{ -0.5, -0.5, 0.5, -0.5, 0.0, 0.5 };
+    //const vertices = &[_]f32{ -0.5, -0.5, 0.5, -0.5, 0.0, 0.5 };
+
+    const vertices = &[_]f32{
+        -0.5, -0.5,
+        -0.5,  0.5,
+        0.5,  0.5,
+        0.5, -0.5,
+    };
+
+    const indices = &[_]u32{
+        0, 1, 2,
+        0, 2, 3,
+    };
 
     var vao: u32 = undefined;
     gl.genVertexArrays(1, &vao);
     gl.bindVertexArray(vao);
+
+    var ebo: u32 = undefined;
+    gl.genBuffers(1, &ebo);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        indices.len * @sizeOf(u32),
+        indices.ptr,
+        gl.STATIC_DRAW
+    );
+
 
     var vbo: u32 = undefined;
     gl.genBuffers(1, &vbo);
@@ -47,6 +70,8 @@ pub fn main() !void {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 2 * @sizeOf(f32), null);
     gl.enableVertexAttribArray(0);
 
+
+    // TODO: hot reload shaders
     const vertex_shader_src = @embedFile("vertex.glsl");
     const vertex_shader = gl.createShader(gl.VERTEX_SHADER);
 
@@ -82,9 +107,15 @@ pub fn main() !void {
         gl.clearColor(0.1, 0.1, 0.1, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
+
+        // changing the color using uniforms
+        const color: [3]f32 = .{1.0, 1.0, 0.0}; // yellow
+        const color_location = gl.getUniformLocation(shader_program, "uColor");
+        gl.uniform3fv(color_location, 1, &color[0]);
+
         gl.useProgram(shader_program);
         gl.bindVertexArray(vao);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, null);
 
         // updates
         glfw.swapBuffers(window);
