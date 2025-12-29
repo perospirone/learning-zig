@@ -17,9 +17,11 @@ pub fn build(b: *std.Build) void {
     // setting dependencies
     const zglfw = b.dependency("zglfw", .{.target = target});
     const zopengl = b.dependency("zopengl", .{});
+    const zmath = b.dependency("zmath", .{});
 
     exe.root_module.addImport("zglfw", zglfw.module("root"));
     exe.root_module.addImport("zopengl", zopengl.module("root"));
+    exe.root_module.addImport("zmath", zmath.module("root"));
 
     //if (target.result.os.tag != .emscripten) {
         //exe.linkLibrary(zglfw.artifact("glfw"));

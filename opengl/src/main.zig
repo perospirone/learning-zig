@@ -2,11 +2,24 @@ const std = @import("std");
 
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
+const zmath = @import("zmath");
 
 const gl = zopengl.bindings;
 
 const GL_VERSION_MAJOR = 3;
 const GL_VERSION_MINOR = 3;
+
+const Camera = struct {
+    yaw: f32,
+    pitch: f32,
+    speed: f32,
+    sensitivity: f32,
+    zoom: f32,
+
+    position: zmath.Vec, // where you are
+    direction: zmath.Vec, // where you are looking
+    up: zmath.Vec, // waht is upward for the camera
+};
 
 pub fn main() !void {
     try glfw.init();
@@ -19,7 +32,7 @@ pub fn main() !void {
     glfw.windowHint(.context_version_minor, GL_VERSION_MINOR);
     glfw.windowHint(.opengl_profile, .opengl_core_profile);
 
-    const window = try glfw.createWindow(scr_width, scr_height, "learning-zig-opengl", null);
+    const window = try glfw.createWindow(scr_width, scr_height, "zig-opengl-floatingwindow", null);
     defer window.destroy();
 
     glfw.makeContextCurrent(window);
@@ -30,15 +43,62 @@ pub fn main() !void {
     //const vertices = &[_]f32{ -0.5, -0.5, 0.5, -0.5, 0.0, 0.5 };
 
     const vertices = &[_]f32{
-        -0.5, -0.5,
-        -0.5,  0.5,
-        0.5,  0.5,
-        0.5, -0.5,
+        // Front face (z = 0.5)
+        -0.5, -0.5, 0.5, // v0
+        0.5, -0.5, 0.5, // v1
+        0.5, 0.5, 0.5, // v2
+        -0.5, 0.5, 0.5, // v3
+
+        // Back face (z = -0.5)
+        -0.5, -0.5, -0.5, // v4
+        0.5, -0.5, -0.5, // v5
+        0.5, 0.5, -0.5, // v6
+        -0.5, 0.5, -0.5, // v7
+
+        // Left face (x = -0.5)
+        -0.5, -0.5, -0.5, // v8
+        -0.5, 0.5, -0.5, // v9
+        -0.5, 0.5, 0.5, // v10
+        -0.5, -0.5, 0.5, // v11
+
+        // Right face (x = 0.5)
+        0.5, -0.5, -0.5, // v12
+        0.5, 0.5, -0.5, // v13
+        0.5, 0.5, 0.5, // v14
+        0.5, -0.5, 0.5, // v15
+
+        // Top face (y = 0.5)
+        -0.5, 0.5, -0.5, // v16
+        0.5, 0.5, -0.5, // v17
+        0.5, 0.5, 0.5, // v18
+        -0.5, 0.5, 0.5, // v19
+
+        // Bottom face (y = -0.5)
+        -0.5, -0.5, -0.5, // v20
+        0.5, -0.5, -0.5, // v21
+        0.5, -0.5, 0.5, // v22
+        -0.5, -0.5, 0.5, // v23
     };
 
     const indices = &[_]u32{
-        0, 1, 2,
-        0, 2, 3,
+        // Front
+        0,  1,  2,
+        0,  2,  3,
+        // Back
+        4,  5,  6,
+        4,  6,  7,
+        // Left
+        8,  9,  10,
+        8,  10, 11,
+        // Right
+        12, 13, 14,
+        12, 14, 15,
+        // Top
+        16, 17, 18,
+        16, 18, 19,
+        // Bottom
+        20, 21, 22,
+        20, 22, 23,
     };
 
     var vao: u32 = undefined;
@@ -48,13 +108,7 @@ pub fn main() !void {
     var ebo: u32 = undefined;
     gl.genBuffers(1, &ebo);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
-    gl.bufferData(
-        gl.ELEMENT_ARRAY_BUFFER,
-        indices.len * @sizeOf(u32),
-        indices.ptr,
-        gl.STATIC_DRAW
-    );
-
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices.len * @sizeOf(u32), indices.ptr, gl.STATIC_DRAW);
 
     var vbo: u32 = undefined;
     gl.genBuffers(1, &vbo);
@@ -67,9 +121,8 @@ pub fn main() !void {
         gl.STATIC_DRAW,
     );
 
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 2 * @sizeOf(f32), null);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 3 * @sizeOf(f32), null);
     gl.enableVertexAttribArray(0);
-
 
     // TODO: hot reload shaders
     const vertex_shader_src = @embedFile("vertex.glsl");
@@ -103,22 +156,46 @@ pub fn main() !void {
     gl.deleteShader(vertex_shader);
     gl.deleteShader(fragment_shader);
 
+
+    const cam = Camera{
+        .yaw = -90.0,
+        .pitch = 0.0,
+        .speed = 4.5,
+        .sensitivity = 0.1,
+        .zoom = 45.0,
+        .position = zmath.loadArr3([_]f32{0.0, 0.0, 3.0}),
+        .direction = zmath.loadArr3([_]f32{0.0, 0.0, -1.0}),
+        .up = zmath.loadArr3([_]f32{0.0, 1.0, 0.0}),
+    };
+
+    const view = zmath.lookAtRh(cam.position, cam.position + cam.direction, cam.up);
+    const projection = zmath.perspectiveFovRh(cam.zoom, scr_width/scr_height, 0.1, 100.0);
+
+
+    gl.enable(gl.DEPTH_TEST);
+
     while (!glfw.windowShouldClose(window)) {
         gl.clearColor(0.1, 0.1, 0.1, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
-
-        // changing the color using uniforms
-        const color: [3]f32 = .{1.0, 1.0, 0.0}; // yellow
-        const color_location = gl.getUniformLocation(shader_program, "uColor");
-        gl.uniform3fv(color_location, 1, &color[0]);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.useProgram(shader_program);
         gl.bindVertexArray(vao);
-        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, null);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, null);
+
+        // changing the color using uniforms
+        const color: [3]f32 = .{ 1.0, 1.0, 0.0 }; // yellow
+        const color_location = gl.getUniformLocation(shader_program, "uColor");
+        gl.uniform3fv(color_location, 1, &color[0]);
+
+        const view_loc = gl.getUniformLocation(shader_program, "uView");
+        gl.uniformMatrix4fv(view_loc, 1, gl.FALSE, @ptrCast(&view));
+
+        const proj_loc = gl.getUniformLocation(shader_program, "uProjection");
+        gl.uniformMatrix4fv(proj_loc, 1, gl.FALSE, @ptrCast(&projection));
 
         // updates
         glfw.swapBuffers(window);
         glfw.pollEvents();
     }
 }
+

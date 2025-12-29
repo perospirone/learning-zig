@@ -40,6 +40,10 @@
             .url = "https://github.com/zig-gamedev/zopengl/archive/d235e52696f2ef6ae33b9d852242f82e3da74236.tar.gz",
             .hash = "zopengl-0.6.0-dev-5-tnzwZfCQBDcGcI08CJCLeTkgEGKzmt9Hlq9UoCgqS9",
         },
+        .zmath = .{
+            .url = "git+https://github.com/zig-gamedev/zmath.git#3a5955b2b72cd081563fbb084eff05bffd1e3fbb",
+            .hash = "zmath-0.11.0-dev-wjwivdMsAwD-xaLj76YHUq3t9JDH-X16xuMTmnDzqbu2",
+        },
     },
     .paths = .{
         "build.zig",
